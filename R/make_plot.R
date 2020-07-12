@@ -30,7 +30,6 @@ make_plot<- function(ci){
     ggplot(aes(y = var, yend = var, x = lower, xend = upper, colour = metavar)) +
     geom_vline(xintercept = 1) +
     geom_segment(size = 2) +
-    theme_minimal() +
     scale_x_log10(breaks = seq(from = 0.75, to = 3, by = 0.25)) +
     scale_colour_brewer(palette = "Set2") +
     labs(x ="95% confidence interval of odds ratio of dying",
