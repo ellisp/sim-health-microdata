@@ -28,12 +28,12 @@ r_tot <- rc_tot %>%
 rx_tot <- expand.grid(race = races, sex = sexes) %>%
   left_join(r_tot, by = "race") %>%
   mutate(Freq = case_when(
-    sex == "Male" & race == "Klingon" ~ 0.40 * race_total,
+    sex == "Male" & race == "Klingon"   ~ 0.40 * race_total,
     sex == "Female" & race == "Klingon" ~ 0.56 * race_total,
-    sex == "Male"                     ~ 0.47 * race_total,
-    sex == "Female"                   ~ 0.49 * race_total,
-    sex == "Missing"                  ~ 0.03 * race_total,
-    sex == "Other"                    ~ 0.01 * race_total
+    sex == "Male"                       ~ 0.47 * race_total,
+    sex == "Female"                     ~ 0.49 * race_total,
+    sex == "Missing"                    ~ 0.03 * race_total,
+    sex == "Other"                      ~ 0.01 * race_total
   )) %>%
   select(-race_total)
 
@@ -166,16 +166,20 @@ the_sample <- the_sample %>%
          sex     = fct_relevel(sex, "Male"))
            
 
-the_sample %>%
+ep1 <- the_sample %>%
   sample_n(size = 2000) %>%
   select(unobserved1, unobserved2, propensity_treatment, propensity_death) %>%
   ggpairs()
 
 
-the_sample %>%
+ep2 <- the_sample %>%
   select(smoking, weight, received_treatment, death, sex) %>%
   sample_n(size = 2000) %>%
   ggpairs(mapping = aes(fill = sex, colour = sex))
+
+the_sample %>%
+  select(continent, race, sex, smoking, weight, comorbidity, received_treatment, death)
+
 
 #===============fitting a model============
 
@@ -190,7 +194,7 @@ anova(mod1, test = "Chi")
 ci1 <- confint(mod1)
 
 p1 <- make_plot(ci1)
-p1
+
 #---------------Model 2 - without co-morbidity------------
 
 mod2 <- glm(death ~ continent + weight + race + sex + smoking + weight + received_treatment, 
@@ -200,4 +204,6 @@ mod2 <- glm(death ~ continent + weight + race + sex + smoking + weight + receive
 ci2 <- confint(mod2)
 
 p2 <- make_plot(ci2)
-p2
+
+svg_png(p1, "output/with-comorbidity")
+svg_png(p2, "output/without-confounding")
