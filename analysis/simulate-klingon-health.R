@@ -1,8 +1,4 @@
-library(tidyverse)
-library(survey)
-library(boot)
-library(GGally)
-library(broom)
+source("setup.R")
 
 #================Create some marginal totals===============
 
@@ -138,28 +134,36 @@ the_sample <- the_sample %>%
             0.2 * (weight == "Obese") +
            -0.2 * (weight == "Healthy weight") +
            unobserved1 / 10 +
-           -2) %>%
-  mutate(received_treatment = rbinom(n = n(), size = 1,
-                                     prob = inv.logit(propensity_treatment)),
-         propensity_death =
+           -2,
+         received_treatment = rbinom(n = n(), size = 1,
+                                     prob = inv.logit(propensity_treatment))) %>%
+  mutate(propensity_comorbidity = 
+           1.1 * (smoking == "Smoking") +
+           0.3 * (weight == "Obese") +
+           0.1 * (sex == "Male"),
+         comorbidity = rbinom(n = n(), size = 1, 
+                              prob = inv.logit(propensity_comorbidity))) %>%
+  mutate(propensity_death =
             0.3 * (continent == "Oceania") +
            -0.1 * (continent == "Eurasia") +
             0.2 * (race == "Klingon") +
            -0.2 * (race == "Vulcan") +
-            0.2 * (smoking == "Smoking") +
             0.1 * (smoking == "Missing") +
             0.19 * (sex == "Male") +
-            0.31 * (weight == "Obese") +
+            0.1 * (weight == "Obese") +
            -0.2 * (weight == "Healthy weight") +
            -0.05 * (weight == "Under weight") +
             unobserved1 / 12 +
             unobserved2 / 8 +
+            0.8  * comorbidity +
             0.2 * received_treatment +
            -3) %>%
   mutate(death = rbinom(n = n(), size = 1,
                         prob = inv.logit(propensity_death))) %>%
-  mutate(weight = fct_relevel(weight, "Healthy weight"),
-         smoking = fct_relevel(smoking, "Non-smoking"))
+  mutate(weight  = fct_relevel(weight, "Healthy weight"),
+         smoking = fct_relevel(smoking, "Non-smoking"),
+         race    = fct_relevel(race, "Human"),
+         sex     = fct_relevel(sex, "Male"))
            
 
 the_sample %>%
@@ -175,48 +179,25 @@ the_sample %>%
 
 #===============fitting a model============
 
-mod1 <- glm(death ~ continent + weight + race + sex + smoking + weight + received_treatment, 
+#---------------Model 1 - with co-morbidity------------
+
+mod1 <- glm(death ~ continent + weight + race + sex + smoking + weight + comorbidity + received_treatment, 
             family = "binomial",
             data = the_sample)
 
 summary(mod1)
 anova(mod1, test = "Chi")
-ci <- confint(mod1)
+ci1 <- confint(mod1)
 
-ci %>%
-  tidy() %>%
-  rename(var = .rownames,
-         upper = X97.5..,
-         lower = X2.5..) %>%
-  mutate(metavar = case_when(
-    grepl("continent", var) ~ "Continent compared to 'Eastasia'",
-    grepl("weight", var) ~ "Weight compared to 'healthy weight'",
-    grepl("race", var) ~ "Race compared to 'Human'",
-    grepl("sex", var) ~ "Sex compared to 'Male'",
-    grepl("smoking", var) ~ "Smoking status",
-    var == "received_treatment" ~ "Treatment"
-  )) %>%
-  mutate(var = gsub("^continent", "", var),
-         var = gsub("^weight", "", var),
-         var = gsub("^race", "", var),
-         var = gsub("^sex", "", var),
-         var = gsub("^smoking", "", var),
-         var = gsub("received_treatment", "Received treatment", var)) %>%
-  filter(!var %in% c("(Intercept)", "Missing")) %>%
-  mutate(mid = (upper + lower) / 2,
-         metavar = fct_reorder(metavar, -mid),
-         var = fct_reorder2(var, mid, metavar)) %>%
-  mutate_if(is.numeric, exp) %>%
-  ggplot(aes(y = var, yend = var, x = lower, xend = upper, colour = metavar)) +
-  geom_vline(xintercept = 1) +
-  geom_segment(size = 2) +
-  theme_minimal() +
-  scale_x_log10(breaks = c(0.5, 1, 1.5, 2, 2.5)) +
-  labs(x ="95% confidence interval of odds ratio of dying",
-       y = "",
-       colour = "Type of variable",
-       title = "Simulating plausible microdata for clinical studies",
-       subtitle = str_wrap("Demonstration of how to create a fake observational study given marginal totals, 
-       a model for propensity to receive treatment, and a model for impact on target variable.", 85),
-       caption = "http://freerangestats.info")
+p1 <- make_plot(ci1)
+p1
+#---------------Model 2 - without co-morbidity------------
 
+mod2 <- glm(death ~ continent + weight + race + sex + smoking + weight + received_treatment, 
+            family = "binomial",
+            data = the_sample)
+
+ci2 <- confint(mod2)
+
+p2 <- make_plot(ci2)
+p2
